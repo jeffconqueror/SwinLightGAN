@@ -34,4 +34,3 @@ class LowLightDataset(Dataset):
         return low_light_img, well_lit_img
 
         
-        return low_light_img, well_lit_img
