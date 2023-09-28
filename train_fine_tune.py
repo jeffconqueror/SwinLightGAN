@@ -7,6 +7,8 @@ import torch.optim as optim
 import torch.nn as nn
 import os
 from torchvision.utils import save_image
+from tqdm import tqdm
+
 
 # print(torch.cuda.device_count())
 # print(torch.cuda.is_available())
@@ -38,11 +40,11 @@ def main():
     model.to(device)  # Here, you missed out specifying the 'device' 
 
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001) 
+    optimizer = optim.AdamW(model.parameters(), lr=0.0001) 
 
     num_epochs = 50
     for epoch in range(num_epochs):
-        for i, (low_light_imgs, well_lit_imgs) in enumerate(dataloader):
+        for i, (low_light_imgs, well_lit_imgs) in enumerate(tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}")):
             
             low_light_imgs, well_lit_imgs = low_light_imgs.to(device), well_lit_imgs.to(device)
             optimizer.zero_grad()

@@ -1,5 +1,3 @@
 Train_data/lol_dataset
 weights/*
-enhanced_images
-enhanced_images1
-test_enhanced_images
+train_image/
