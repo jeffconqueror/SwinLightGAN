@@ -648,7 +648,7 @@ class SwinIR(nn.Module):
                  window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, upscale=2, img_range=1., upsampler='', resi_connection='1conv',
+                 use_checkpoint=False, upscale=1, img_range=1., upsampler='', resi_connection='1conv',
                  **kwargs):
         super(SwinIR, self).__init__()
         num_in_ch = in_chans
@@ -760,6 +760,7 @@ class SwinIR(nn.Module):
         else:
             # for image denoising and JPEG compression artifact reduction
             self.conv_last = nn.Conv2d(embed_dim, num_out_ch, 3, 1, 1)
+            self.relu = nn.ReLU(inplace=True)
 
         self.apply(self._init_weights)
 
@@ -803,6 +804,7 @@ class SwinIR(nn.Module):
         return x
 
     def forward(self, x):
+        # print("input size:", x.shape)
         H, W = x.shape[2:]
         x = self.check_image_size(x)
         
@@ -825,15 +827,16 @@ class SwinIR(nn.Module):
             x = self.conv_first(x)
             x = self.conv_after_body(self.forward_features(x)) + x
             x = self.conv_before_upsample(x)
-            x = self.lrelu(self.conv_up1(torch.nn.functional.interpolate(x, scale_factor=2, mode='nearest')))
+            # x = self.lrelu(self.conv_up1(torch.nn.functional.interpolate(x, scale_factor=2, mode='nearest')))
+            x = self.lrelu(self.conv_up1(x))
             if self.upscale == 4:
                 x = self.lrelu(self.conv_up2(torch.nn.functional.interpolate(x, scale_factor=2, mode='nearest')))
-            x = self.conv_last(self.lrelu(self.conv_hr(x)))
+            x = self.conv_last(self.conv_hr(x))
         else:
             # for image denoising and JPEG compression artifact reduction
             x_first = self.conv_first(x)
             res = self.conv_after_body(self.forward_features(x_first)) + x_first
-            x = x + self.conv_last(res)
+            x = x + self.relu(self.conv_last(res))
 
         x = x / self.img_range + self.mean
 

@@ -1,3 +1,5 @@
-Train_data/lol_dataset
+Train_data/
 weights/*
 train_image/
+Test_image
+train_newModel_image
