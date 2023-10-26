@@ -34,6 +34,7 @@ def train():
     L_TV = loss1.L_TV()
 
     model = zeroDCEgen.ZeroDCEenhancer()
+    
     model.apply(weights_init)
 
     model = nn.DataParallel(model)
@@ -43,7 +44,8 @@ def train():
     optimizer = optim.AdamW(model.parameters(), lr=1e-4) 
     num_epochs = 200
     best_train_loss = float('inf')
-
+    total_params = sum(p.numel() for p in model.parameters())
+    print(total_params)
     for epoch in range(num_epochs):
         for i, low_light_imgs in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")):
             low_light_imgs = low_light_imgs.to(device)
@@ -82,20 +84,20 @@ def test_model(model, dataloader, device, save_dir):
 
 
 if __name__ == "__main__":
-    # train()
+    train()
 
-    test_dataset = zeroDCEloader.lowlight_loader("Train_data/lol_dataset/eval15/")
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
-    model = zeroDCEgen.ZeroDCEenhancer()
+    # test_dataset = zeroDCEloader.lowlight_loader("Train_data/lol_dataset/eval15/")
+    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
+    # model = zeroDCEgen.ZeroDCEenhancer()
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/zeroDce_with_original.pth")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # state_dict = torch.load("./weights/zeroDce_with_original.pth")
 
-    # Create a new state dictionary with the "module." prefix removed from each key
-    new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    model.load_state_dict(new_state_dict)  # Load the trained weights
-    model.to(device)
-    save_dir = "./Test_image/zeroDce_with_original"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    test_model(model, test_dataloader, device, save_dir)
+    # # Create a new state dictionary with the "module." prefix removed from each key
+    # new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    # model.load_state_dict(new_state_dict)  # Load the trained weights
+    # model.to(device)
+    # save_dir = "./Test_image/zeroDce_with_original"
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # test_model(model, test_dataloader, device, save_dir)
