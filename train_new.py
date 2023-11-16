@@ -84,20 +84,20 @@ def test_model(model, dataloader, device, save_dir):
 
 
 if __name__ == "__main__":
-    train()
+    # train()
 
-    # test_dataset = zeroDCEloader.lowlight_loader("Train_data/lol_dataset/eval15/")
-    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
-    # model = zeroDCEgen.ZeroDCEenhancer()
+    test_dataset = zeroDCEloader.lowlight_loader("Train_data/lol_dataset1/eval15/")
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
+    model = zeroDCEgen.ZeroDCEenhancer()
 
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # state_dict = torch.load("./weights/zeroDce_with_original.pth")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    state_dict = torch.load("./weights/zeroDce.pth")
 
-    # # Create a new state dictionary with the "module." prefix removed from each key
-    # new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    # model.load_state_dict(new_state_dict)  # Load the trained weights
-    # model.to(device)
-    # save_dir = "./Test_image/zeroDce_with_original"
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # test_model(model, test_dataloader, device, save_dir)
+    # Create a new state dictionary with the "module." prefix removed from each key
+    new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    model.load_state_dict(new_state_dict)  # Load the trained weights
+    model.to(device)
+    save_dir = "./Test_image/zeroDce"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    test_model(model, test_dataloader, device, save_dir)

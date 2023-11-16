@@ -19,7 +19,7 @@ class LowLightDataset(Dataset):
 
         # Data augmentation and transformations
         self.transform = transforms.Compose([
-            transforms.Resize((512, 512)),
+            transforms.Resize((224, 224)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(224),
             transforms.ToTensor(),

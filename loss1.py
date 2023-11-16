@@ -46,8 +46,12 @@ class L_spa(nn.Module):
         org_mean = torch.mean(org,1,keepdim=True)
         enhance_mean = torch.mean(enhance,1,keepdim=True)
 
-        org_pool =  self.pool(org_mean)			
-        enhance_pool = self.pool(enhance_mean)	
+        # org_pool =  self.pool(org_mean)			
+        # enhance_pool = self.pool(enhance_mean)	
+        org_pool = org_mean
+        enhance_pool = enhance_mean
+        # print("Enhance Pool Shape:", enhance_pool.shape)
+        # print("Org Pool Shape:", org_pool.shape)
 
         weight_diff =torch.max(torch.FloatTensor([1]).cuda() + 10000*torch.min(org_pool - torch.FloatTensor([0.3]).cuda(),torch.FloatTensor([0]).cuda()),torch.FloatTensor([0.5]).cuda())
         E_1 = torch.mul(torch.sign(enhance_pool - torch.FloatTensor([0.5]).cuda()) ,enhance_pool-org_pool)
