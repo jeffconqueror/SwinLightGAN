@@ -41,15 +41,15 @@ def weights_init(m):
 
 
 def train():
-    save_dir = "./train_experiment/adddynamicattentionmorelayer1"
+    save_dir = "./train_experiment/4channelrefinenodynamicdenoisebatch8large"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
 
-    dataset = retinexDCE_loader("Train_data/lol_dataset2/our485/")
+    dataset = retinexDCE_loader("Train_data/lol_dataset1/our485/")
     train_dataset, val_dataset = train_test_split(dataset, test_size=0.1, random_state=42)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=16, shuffle=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=16, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
 
     L_color = loss1.L_color()
     L_spa = loss1.L_spa()
@@ -64,8 +64,8 @@ def train():
     model.to(device)
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4) 
-    num_epochs = 100
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5) 
+    num_epochs = 150
     # best_train_loss = float('inf')
     criterion = VGGLoss()
     criterion1 = CharbonnierLoss()
@@ -106,9 +106,10 @@ def train():
             
 
             #add loss
-            loss =  loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
+            loss = loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
             # + 0.5*loss_vgg1 + 0.5*loss_charon1 + 10 * loss_color2
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             # if (epoch + 1) % 5 == 0:
@@ -126,7 +127,7 @@ def train():
                     low_output = R_low*I_low_3
                     
                     normal_output = R_high*torch.concat([I_high, I_high, I_high], dim=1)
-                    loss_spa = torch.mean(L_spa(low_output, low_light_imgs))
+                    loss_spa = 5*torch.mean(L_spa(low_output, low_light_imgs))
                     loss_col = 5*torch.mean(L_color(low_output))
                     loss_exp = 100*torch.mean(L_exp(low_output))
 
@@ -142,16 +143,16 @@ def train():
                     loss_vgg1 = criterion(low_output, well_lit_imgs) #vgg loss
                     loss_charon1 = criterion1(low_output, well_lit_imgs)
                     
-                    val_loss += loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
+                    val_loss +=  loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
                     
                     if (epoch + 1) % 5 == 0:
                         save_path = os.path.join(save_dir, f"val_epoch_{epoch}_batch_{i}.jpg")
                         save_image(low_output, save_path, normalize=True)
             avg_val_loss = val_loss / len(val_dataloader)
-            print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {loss.item()}, Validation Loss: {avg_val_loss.item()}')
+            print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {loss}, Validation Loss: {avg_val_loss.item()}')
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/adddynamicattentionmorelayer1.pth")
+                torch.save(model.state_dict(), f"./weights/4channelrefinenodynamicdenoisebatch8large.pth")
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -167,20 +168,20 @@ def test_model(model, dataloader, device, save_dir):
             save_image(low_output, save_path, normalize=True)
 
 if __name__ == "__main__":
-    # train()
+    train()
     
     test_dataset = retinexDCE_loader("Train_data/lol_dataset2/eval15/")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
     model = SimpleRetinexDce()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/adddynamicattentionmorelayer1.pth")
+    state_dict = torch.load("./weights/4channelrefinenodynamicdenoisebatch8large.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/adddynamicattentionmorelayer1"
+    save_dir = "./Test_image/4channelrefinenodynamicdenoisebatch8large"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)

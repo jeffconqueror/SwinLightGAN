@@ -52,7 +52,7 @@ class retinexDCE_loader(data.Dataset):
         
         # data_lowlight_path = 
         data_lowlight = Image.open(data_lowlight_path)
-        data_lowlight = data_lowlight.resize((224,224), Image.LANCZOS)
+        data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
         data_lowlight = (np.asarray(data_lowlight)/255.0) 
         data_lowlight = torch.from_numpy(data_lowlight).float()
 		
@@ -60,7 +60,7 @@ class retinexDCE_loader(data.Dataset):
 		#high
         # data_highlight_path = self.data_highlight_path[index]
         data_highlight = Image.open(data_highlight_path)
-        data_highlight = data_highlight.resize((224,224), Image.LANCZOS)
+        data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
         data_highlight = (np.asarray(data_highlight)/255.0) 
         data_highlight = torch.from_numpy(data_highlight).float()
         return data_lowlight.permute(2,0,1), data_highlight.permute(2,0,1)

@@ -237,18 +237,18 @@ class SimpleRetinexDce(nn.Module):
         self.dynamic_range = DynamicRangeCompression() 
         self.refine = RefinementLayer(channels=1)
         self.dark_attention = DarkRegionAttentionModule(channels=1)
-        # self.denoise = DenoiseLayer(channels=3)
+        self.denoise = DenoiseLayer(channels=3)
 
 
     def forward(self, low, high):
         R_low, I_low = self.decompose(low)
         R_high, I_high = self.decompose(high)
         
-        # R_low = self.denoise(R_low)
+        R_low = self.denoise(R_low)
         
         I_low = self.dark_attention(I_low)
         enhanced_I_low = self.illumination_enhancer(R_low, I_low)
-        enhanced_I_low = self.dynamic_range(enhanced_I_low)
+        # enhanced_I_low = self.dynamic_range(enhanced_I_low)
         enhanced_I_low = self.refine(enhanced_I_low)
         return R_low, R_high, enhanced_I_low, I_high
     
