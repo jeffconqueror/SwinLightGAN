@@ -229,9 +229,9 @@ class IlluminationEnhancerUNet(nn.Module):
         return output
 
 
-class SimpleRetinexDce(nn.Module):
+class RetinexUnet(nn.Module):
     def __init__(self):
-        super(SimpleRetinexDce, self).__init__()
+        super(RetinexUnet, self).__init__()
         self.decompose = DecomposeNet()
         self.illumination_enhancer = IlluminationEnhancerUNet()
         self.dynamic_range = DynamicRangeCompression() 
@@ -254,7 +254,7 @@ class SimpleRetinexDce(nn.Module):
     
     
 if __name__ == "__main__":
-    model = SimpleRetinexDce()
+    model = RetinexUnet()
     low_light_img = torch.rand(1, 3, 256, 256)  # Example low-light image
     well_lit_img = torch.rand(1, 3, 256, 256)   # Example well-lit image
     output = model(low_light_img, well_lit_img)

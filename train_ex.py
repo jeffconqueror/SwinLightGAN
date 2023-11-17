@@ -2,7 +2,7 @@ import torch
 from dataload.retinexDCEloader import retinexDCE_loader
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from network.retinex_dce import SimpleRetinexDce
+from network.retinex_dce import RetinexUnet
 import torch.optim as optim
 import torch.nn as nn
 import os
@@ -56,7 +56,7 @@ def train():
     L_exp = loss1.L_exp(16,0.6)
     L_TV = loss1.L_TV()
 
-    model = SimpleRetinexDce()
+    model = RetinexUnet()
     # model.apply(weights_init)
 
     model = nn.DataParallel(model)
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     
     test_dataset = retinexDCE_loader("Train_data/lol_dataset2/eval15/")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
-    model = SimpleRetinexDce()
+    model = RetinexUnet()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     state_dict = torch.load("./weights/4channelrefinenodynamicdenoisebatch8large.pth")
