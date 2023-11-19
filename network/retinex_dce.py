@@ -2,16 +2,31 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
+from thop import profile
        
-class BasicConvLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1):
-        super(BasicConvLayer, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
-        self.relu = nn.ReLU(inplace=True)
+# class BasicConvLayer(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1):
+#         super(BasicConvLayer, self).__init__()
+#         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding)
+#         self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x):
-        return self.relu(self.conv(x))
+#     def forward(self, x):
+#         return self.relu(self.conv(x))
+    
+# class DynamicRangeCompression(nn.Module):
+#     def __init__(self):
+#         super(DynamicRangeCompression, self).__init__()
+#         self.compression_factor = nn.Parameter(torch.ones(1))  # Learnable parameter
+#         self.offset = nn.Parameter(torch.tensor(0.0))
 
+    # def forward(self, x):
+    #     # Example: logarithmic compression
+    #     # Ensure x is positive and non-zero for logarithm
+    #     x = torch.sigmoid(self.compression_factor * x + self.offset)
+    #     # x = torch.clamp(x, min=1e-6)
+    #     # return torch.log1p(x * self.compression_factor + self.offset)
+    #     return x
+    
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
         super(ResidualBlock, self).__init__()
@@ -27,16 +42,6 @@ class ResidualBlock(nn.Module):
         out = self.bn2(self.conv2(out))
         out += identity
         return self.relu(out)
-
-class DilatedConvLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, dilation=1):
-        super(DilatedConvLayer, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding, dilation=dilation)
-        self.bn = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        return self.relu(self.bn(self.conv(x)))
 
 class UNetConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -117,20 +122,6 @@ class DecomposeNet(nn.Module):
         L        = torch.sigmoid(outs[:, 3:4, :, :])
         return R, L
 
-class DynamicRangeCompression(nn.Module):
-    def __init__(self):
-        super(DynamicRangeCompression, self).__init__()
-        self.compression_factor = nn.Parameter(torch.ones(1))  # Learnable parameter
-        self.offset = nn.Parameter(torch.tensor(0.0))
-
-    def forward(self, x):
-        # Example: logarithmic compression
-        # Ensure x is positive and non-zero for logarithm
-        x = torch.sigmoid(self.compression_factor * x + self.offset)
-        # x = torch.clamp(x, min=1e-6)
-        # return torch.log1p(x * self.compression_factor + self.offset)
-        return x
-
 class DarkRegionAttentionModule(nn.Module):
     def __init__(self, channels):
         super(DarkRegionAttentionModule, self).__init__()
@@ -195,7 +186,8 @@ class IlluminationEnhancerUNet(nn.Module):
         super(IlluminationEnhancerUNet, self).__init__()
         # Reduced channel sizes for each block
         self.encoder1 = UNetConvBlock(4, 64)  # Start with 32 channels
-        self.encoder2 = UNetConvBlock(64, 128)
+        self.encoder2 = nn.Sequential(UNetConvBlock(64, 128), ResidualBlock(128))
+        # self.encoder2 = UNetConvBlock(64, 128)
         self.encoder3 = UNetConvBlock(128, 256)
 
         # Reduced bottom layer size
@@ -223,6 +215,7 @@ class IlluminationEnhancerUNet(nn.Module):
 
         up3 = self.up3(bottom, enc3)
         up2 = self.up2(up3, enc2)
+       
         up1 = self.up1(up2, enc1)
 
         output = self.final(up1)
@@ -234,10 +227,10 @@ class RetinexUnet(nn.Module):
         super(RetinexUnet, self).__init__()
         self.decompose = DecomposeNet()
         self.illumination_enhancer = IlluminationEnhancerUNet()
-        self.dynamic_range = DynamicRangeCompression() 
         self.refine = RefinementLayer(channels=1)
         self.dark_attention = DarkRegionAttentionModule(channels=1)
         self.denoise = DenoiseLayer(channels=3)
+        
 
 
     def forward(self, low, high):
@@ -247,15 +240,17 @@ class RetinexUnet(nn.Module):
         R_low = self.denoise(R_low)
         
         I_low = self.dark_attention(I_low)
+        
         enhanced_I_low = self.illumination_enhancer(R_low, I_low)
-        # enhanced_I_low = self.dynamic_range(enhanced_I_low)
         enhanced_I_low = self.refine(enhanced_I_low)
         return R_low, R_high, enhanced_I_low, I_high
     
     
 if __name__ == "__main__":
     model = RetinexUnet()
-    low_light_img = torch.rand(1, 3, 256, 256)  # Example low-light image
-    well_lit_img = torch.rand(1, 3, 256, 256)   # Example well-lit image
-    output = model(low_light_img, well_lit_img)
-    print(output)
+    input_low = torch.randn(1, 3, 224, 224)
+    input_high = torch.randn(1, 3, 224, 224)
+    flops, params = profile(model, inputs=(input_low, input_high))
+
+    print('FLOPs: ', flops)
+    print('Parameters: ', params)

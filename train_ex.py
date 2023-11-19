@@ -41,12 +41,12 @@ def weights_init(m):
 
 
 def train():
-    save_dir = "./train_experiment/4channelrefinenodynamicdenoisebatch8large"
+    save_dir = "./train_experiment/4channelrefinenodynamicdenoisebatch8largeUnetLOLSyn"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
 
-    dataset = retinexDCE_loader("Train_data/lol_dataset1/our485/")
+    dataset = retinexDCE_loader("Train_data/VE-LOL-L-Syn/train/")
     train_dataset, val_dataset = train_test_split(dataset, test_size=0.1, random_state=42)
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
@@ -64,8 +64,8 @@ def train():
     model.to(device)
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5) 
-    num_epochs = 150
+    optimizer = optim.Adam(model.parameters(), lr=1e-4) 
+    num_epochs = 80
     # best_train_loss = float('inf')
     criterion = VGGLoss()
     criterion1 = CharbonnierLoss()
@@ -109,7 +109,7 @@ def train():
             loss = loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
             # + 0.5*loss_vgg1 + 0.5*loss_charon1 + 10 * loss_color2
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             # if (epoch + 1) % 5 == 0:
@@ -148,11 +148,13 @@ def train():
                     if (epoch + 1) % 5 == 0:
                         save_path = os.path.join(save_dir, f"val_epoch_{epoch}_batch_{i}.jpg")
                         save_image(low_output, save_path, normalize=True)
+                        # save_path1 = os.path.join(save_dir, f"val_epoch_{epoch}_batch_{i}_high.jpg")
+                        # save_image(well_lit_imgs, save_path1, normalize=True)
             avg_val_loss = val_loss / len(val_dataloader)
             print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {loss}, Validation Loss: {avg_val_loss.item()}')
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/4channelrefinenodynamicdenoisebatch8large.pth")
+                torch.save(model.state_dict(), f"./weights/4channelrefinenodynamicdenoisebatch8largeUnetLOLSyn.pth")
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -165,23 +167,25 @@ def test_model(model, dataloader, device, save_dir):
             I_low_3 = torch.concat([I_low, I_low, I_low], dim=1)
             low_output = R_low*I_low_3
             save_path = os.path.join(save_dir, f"test_batch_{i+1}.jpg")
+            save_path1 = os.path.join(save_dir, f"test_batch_{i+1}_truth.jpg")
             save_image(low_output, save_path, normalize=True)
+            save_image(well_lit_imgs, save_path1, normalize=True)
 
 if __name__ == "__main__":
-    train()
+    # train()
     
-    test_dataset = retinexDCE_loader("Train_data/lol_dataset2/eval15/")
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
+    test_dataset = retinexDCE_loader("Train_data/VE-LOL-L-Syn/test/")
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     model = RetinexUnet()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/4channelrefinenodynamicdenoisebatch8large.pth")
+    state_dict = torch.load("./weights/4channelrefinenodynamicdenoisebatch8largeUnetLOLSyn.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/4channelrefinenodynamicdenoisebatch8large"
+    save_dir = "./Test_image/4channelrefinenodynamicdenoisebatch8largeUnetLOLSyn"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)
