@@ -9,6 +9,7 @@ from PIL import Image
 import glob
 import random
 import cv2
+from torchvision import transforms
 
 random.seed(1143)
 
@@ -45,6 +46,11 @@ class retinexDCE_loader(data.Dataset):
         random.shuffle(self.paired_list)
         self.size = 224
         print("Total training examples:", len(self.paired_list))
+        self.transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            # transforms.RandomRotation(10),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
+        ])
     
     
     def __getitem__(self, index):
@@ -53,6 +59,7 @@ class retinexDCE_loader(data.Dataset):
         # data_lowlight_path = 
         data_lowlight = Image.open(data_lowlight_path)
         data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
+        # data_lowlight = self.transform(data_lowlight)
         data_lowlight = (np.asarray(data_lowlight)/255.0) 
         data_lowlight = torch.from_numpy(data_lowlight).float()
 		
@@ -61,9 +68,29 @@ class retinexDCE_loader(data.Dataset):
         # data_highlight_path = self.data_highlight_path[index]
         data_highlight = Image.open(data_highlight_path)
         data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
+        # data_highlight = self.transform(data_highlight)
         data_highlight = (np.asarray(data_highlight)/255.0) 
         data_highlight = torch.from_numpy(data_highlight).float()
+        
+        
         return data_lowlight.permute(2,0,1), data_highlight.permute(2,0,1)
+        # data_lowlight_path, data_highlight_path = self.paired_list[index]
+
+        # data_lowlight = Image.open(data_lowlight_path).convert('RGB')
+        # data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
+
+        # data_highlight = Image.open(data_highlight_path).convert('RGB')
+        # data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
+
+        # # Apply transformations
+        # data_lowlight = self.transform(data_lowlight)
+        # data_highlight = self.transform(data_highlight)
+
+        # # Convert to tensor
+        # data_lowlight = transforms.ToTensor()(data_lowlight)
+        # data_highlight = transforms.ToTensor()(data_highlight)
+        
+        # return data_lowlight, data_highlight
     
     def __len__(self):
         return len(self.paired_list)
