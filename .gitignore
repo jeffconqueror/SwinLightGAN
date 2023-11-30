@@ -3,4 +3,6 @@ weights/*
 train_image/
 Test_image
 train_newModel_image
+train_oneByOne
 train_experiment
+TransformerEngine
