@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 
 def weights_init(m, negative_slope=0.01):
     if isinstance(m, nn.Conv2d):
-        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu', a=negative_slope)
+        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu', a=negative_slope)
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.BatchNorm2d):
@@ -43,7 +43,7 @@ def weights_init(m, negative_slope=0.01):
 
 
 def train():
-    save_dir = "./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE"
+    save_dir = "./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
@@ -65,10 +65,11 @@ def train():
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
     optimizer = optim.AdamW(model.parameters(), lr=1e-4) 
-    num_epochs = 120
+    num_epochs = 150
     # best_train_loss = float('inf')
     criterion = VGGLoss()
     criterion1 = CharbonnierLoss()
+    criterion2 = nn.MSELoss()
     # criterion2 = ColorLoss()
     best_val_loss = float('inf')
     train_losses = []
@@ -119,6 +120,7 @@ def train():
             loss_vgg1 = criterion(low_output, well_lit_imgs) #vgg loss
             loss_charon1 = criterion1(low_output, well_lit_imgs) #CharbonnierLoss
             # loss_color2 = criterion2(low_output, well_lit_imgs) #color loss
+            # loss_mse = criterion2(low_output, well_lit_imgs)
             
             train_loss_components['loss_spa'] += loss_spa.item()
             train_loss_components['loss_col'] += loss_col.item()
@@ -131,7 +133,7 @@ def train():
             train_loss_components['loss_vgg1'] += 0.02*loss_vgg1.item()
             train_loss_components['loss_charon1'] += loss_charon1.item()
             #add loss
-            loss = loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
+            loss = loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1 
             train_loss += loss.item()
             # + 0.5*loss_vgg1 + 0.5*loss_charon1 + 10 * loss_color2
             loss.backward()
@@ -167,6 +169,7 @@ def train():
             
                     loss_vgg1 = criterion(low_output, well_lit_imgs) #vgg loss
                     loss_charon1 = criterion1(low_output, well_lit_imgs)
+                    loss_mse = criterion2(low_output, well_lit_imgs)
                     
                     val_loss +=  loss_spa + loss_col + loss_exp + 0.01*recon_loss_mutual_low + 0.01*recon_loss_mutual_high + loss_charon + loss_r + loss_i +0.02*loss_vgg1 + loss_charon1
                     
@@ -197,7 +200,7 @@ def train():
             # scheduler.step()
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE.pth")
+                torch.save(model.state_dict(), f"./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark.pth")
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
@@ -205,7 +208,7 @@ def train():
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig('./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE/training_validation_loss_plot.png')
+    plt.savefig('./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark/training_validation_loss_plot.png')
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -219,8 +222,10 @@ def test_model(model, dataloader, device, save_dir):
             # low_output = R_low*I_low_3
             save_path = os.path.join(save_dir, f"test_batch_{i+1}.jpg")
             save_path1 = os.path.join(save_dir, f"test_batch_{i+1}_truth.jpg")
+            save_path2 = os.path.join(save_dir, f"test_batch_{i+1}_low.jpg")
             save_image(low_output, save_path, normalize=True)
             save_image(well_lit_imgs, save_path1, normalize=True)
+            save_image(low_light_imgs, save_path2, normalize=True)
 
 if __name__ == "__main__":
     train()
@@ -230,13 +235,13 @@ if __name__ == "__main__":
     model = RetinexUnet()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE.pth")
+    state_dict = torch.load("./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE"
+    save_dir = "./Test_image/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)

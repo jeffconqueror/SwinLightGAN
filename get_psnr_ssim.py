@@ -37,7 +37,7 @@ def rename_files(folder_path, prefix):
             os.rename(os.path.join(folder_path, filename), os.path.join(folder_path, new_name))
             
 if __name__ == "__main__":
-    folder_path = './Test_image/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSE'
+    folder_path = './Test_image/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark'
     num_images = 100
     average_psnr, average_ssim = calculate_average_psnr_ssim(num_images, folder_path)
     print("Average PSNR:", average_psnr)

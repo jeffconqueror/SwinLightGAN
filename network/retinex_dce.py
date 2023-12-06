@@ -135,19 +135,48 @@ class DecomposeNet(nn.Module):
         L        = torch.sigmoid(outs[:, 3:4, :, :])
         return R, L
 
+# class DarkRegionAttentionModule(nn.Module):
+#     def __init__(self, channels):
+#         super(DarkRegionAttentionModule, self).__init__()
+#         self.attention = nn.Sequential(
+#             nn.Conv2d(channels, 1, kernel_size=3, padding=1, bias=False),
+#             nn.Sigmoid()
+#         )
+
+#     def forward(self, x):
+#         attention_map = self.attention(x)
+#         # Inverse the attention for dark regions
+#         attention_map = 1 - attention_map
+#         return x * attention_map
+
 class DarkRegionAttentionModule(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels, reduction=16):
         super(DarkRegionAttentionModule, self).__init__()
-        self.attention = nn.Sequential(
-            nn.Conv2d(channels, 1, kernel_size=3, padding=1, bias=False),
-            nn.Sigmoid()
-        )
+        # Define separate pathways for different scales
+        self.path1 = nn.Sequential(nn.Conv2d(channels, channels, 3, stride=2, padding=1), nn.ReLU())
+        self.path2 = nn.Sequential(nn.Conv2d(channels, channels, 5, stride=2, padding=2), nn.ReLU())
+        # Upsampling back to original size
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        # Convolution to merge the multi-scale features
+        self.merge_conv = nn.Conv2d(channels*3, channels, 1)
 
     def forward(self, x):
-        attention_map = self.attention(x)
-        # Inverse the attention for dark regions
-        attention_map = 1 - attention_map
-        return x * attention_map
+        # Original path
+        original_features = x
+        # Path 1 features
+        path1_features = self.path1(x)
+        path1_att = torch.sigmoid(path1_features)
+        path1_features = self.upsample(path1_features * path1_att)
+        # Path 2 features
+        path2_features = self.path2(x)
+        path2_att = torch.sigmoid(path2_features)
+        path2_features = self.upsample(path2_features * path2_att)
+        # Merge multi-scale features
+        merged_features = torch.cat([original_features, path1_features, path2_features], dim=1)
+        out = self.merge_conv(merged_features)
+        return out
+
+
 
 
 class DenoiseLayer(nn.Module):
@@ -162,20 +191,23 @@ class DenoiseLayer(nn.Module):
         for i in range(num_of_layers - 2):
             if i % 2 != 0:
                 layers.append(nn.Conv2d(in_channels=features, out_channels=features, kernel_size=kernel_size, padding=padding, bias=False))
-                layers.append(nn.BatchNorm2d(features))
+                # layers.append(nn.BatchNorm2d(features))
                 layers.append(nn.ReLU(inplace=True))
             else:
                 layers.append(nn.Conv2d(in_channels=features, out_channels=features, kernel_size=kernel_size, padding=padding, bias=False))
                 layers.append(nn.BatchNorm2d(features))
-                layers.append(nn.ReLU(inplace=True))
+                layers.append(nn.ReLU(inplace=True)),
+                SEBlock(features),
                 layers.append(ResidualBlock(features))
         layers.append(nn.Conv2d(in_channels=features, out_channels=channels, kernel_size=kernel_size, padding=padding, bias=False))
         self.dncnn = nn.Sequential(*layers)
 
     def forward(self, x):
+        identity = x
         out = self.dncnn(x)
-        return x - out
+        return identity + out
     
+
 class HDR_ToneMappingLayer(nn.Module):
     def __init__(self, input_height=224, input_width=224):
         super(HDR_ToneMappingLayer, self).__init__()
