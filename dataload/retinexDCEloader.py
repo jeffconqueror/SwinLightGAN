@@ -44,7 +44,7 @@ class retinexDCE_loader(data.Dataset):
         # Pairing and shuffling
         self.paired_list = list(zip(low_list, high_list))
         random.shuffle(self.paired_list)
-        self.size = 224
+        self.size = 448
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),

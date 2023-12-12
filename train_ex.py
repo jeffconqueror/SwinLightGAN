@@ -43,12 +43,12 @@ def weights_init(m, negative_slope=0.01):
 
 
 def train():
-    save_dir = "./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark"
+    save_dir = "./train_experiment/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark448"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
 
-    dataset = retinexDCE_loader("Train_data/VE-LOL-L-Syn/train/")
+    dataset = retinexDCE_loader("Train_data/VE-LOL-L-Cap-Full/train/")
     train_dataset, val_dataset = train_test_split(dataset, test_size=0.1, random_state=42)
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
@@ -65,7 +65,7 @@ def train():
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
     optimizer = optim.AdamW(model.parameters(), lr=1e-4) 
-    num_epochs = 150
+    num_epochs = 120
     # best_train_loss = float('inf')
     criterion = VGGLoss()
     criterion1 = CharbonnierLoss()
@@ -200,7 +200,7 @@ def train():
             # scheduler.step()
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark.pth")
+                torch.save(model.state_dict(), f"./weights/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark448.pth")
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
@@ -208,7 +208,7 @@ def train():
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig('./train_experiment/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark/training_validation_loss_plot.png')
+    plt.savefig('./train_experiment/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark448/training_validation_loss_plot.png')
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -230,18 +230,18 @@ def test_model(model, dataloader, device, save_dir):
 if __name__ == "__main__":
     train()
     
-    test_dataset = retinexDCE_loader("Train_data/VE-LOL-L-Syn/test/")
+    test_dataset = retinexDCE_loader("Train_data/VE-LOL-L-Cap-Full/test/")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     model = RetinexUnet()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark.pth")
+    state_dict = torch.load("./weights/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark448.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLSyndeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark"
+    save_dir = "./Test_image/LOLCapdeeperResdenoisereducelayerscheduleradd485reducedecomSEnewdenoiseaddark448"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)

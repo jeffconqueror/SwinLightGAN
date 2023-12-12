@@ -18,6 +18,7 @@ def calculate_psnr_ssim(image1_path, image2_path):
     return psnr_value, ssim_value
 
 def calculate_average_psnr_ssim(num_images, folder_path):
+    print("use path: ", folder_path)
     total_psnr, total_ssim = 0, 0
     for i in range(1, num_images + 1):
         image1_path = f'{folder_path}/test_batch_{i}.jpg'
