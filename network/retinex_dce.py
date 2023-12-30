@@ -91,10 +91,10 @@ class SEBlock(nn.Module): #could try reduction in here
         return x * y.expand_as(x)
      
 class DecomposeNet(nn.Module):
-    def __init__(self, channel=64, kernel_size=3) -> None:
+    def __init__(self, channel=32, kernel_size=3) -> None:
         super(DecomposeNet, self).__init__()
-        self.net1_conv0 = nn.Conv2d(4, channel, kernel_size * 3,
-                                    padding=4, padding_mode='replicate')
+        self.net1_conv0 = nn.Conv2d(4, channel, 1,
+                                    padding=0, padding_mode='replicate')
         self.net1_convs = nn.Sequential(nn.Conv2d(channel, channel, kernel_size,
                                                   padding=1, padding_mode='replicate'),
                                         nn.ReLU(),
@@ -108,20 +108,10 @@ class DecomposeNet(nn.Module):
                                         SEBlock(channel),
                                         nn.Conv2d(channel, channel, kernel_size,
                                                   padding=1, padding_mode='replicate'),
-                                        nn.ReLU(),
-                                        SEBlock(channel),
-                                        nn.Conv2d(channel, channel, kernel_size,
-                                                  padding=1, padding_mode='replicate'),
-                                        nn.ReLU(),
-                                        SEBlock(channel),
-                                        ResidualBlock(channel),  # Adding a residual block
-                                        # DilatedConvLayer(channel, channel, dilation=2),  
-                                        SEBlock(channel),
-                                        nn.Conv2d(channel, channel, kernel_size,
-                                                  padding=1, padding_mode='replicate'),
-                                        nn.ReLU())
+                                        nn.ReLU()
+                                        )
         # Final recon layer
-        self.net1_recon = nn.Conv2d(channel, 4, kernel_size,
+        self.net1_recon = nn.Conv2d(channel, 1, kernel_size,
                                     padding=1, padding_mode='replicate')
         
     def forward(self, input_im):
@@ -131,23 +121,11 @@ class DecomposeNet(nn.Module):
         featss   = self.net1_convs(feats0)
         # print(featss.shape)
         outs     = self.net1_recon(featss)
-        R        = torch.sigmoid(outs[:, 0:3, :, :])
-        L        = torch.sigmoid(outs[:, 3:4, :, :])
-        return R, L
+        # R        = torch.sigmoid(outs[:, 0:3, :, :])
+        # L        = torch.sigmoid(outs[:, 3:4, :, :])
+        # return R, L
+        return outs
 
-# class DarkRegionAttentionModule(nn.Module):
-#     def __init__(self, channels):
-#         super(DarkRegionAttentionModule, self).__init__()
-#         self.attention = nn.Sequential(
-#             nn.Conv2d(channels, 1, kernel_size=3, padding=1, bias=False),
-#             nn.Sigmoid()
-#         )
-
-#     def forward(self, x):
-#         attention_map = self.attention(x)
-#         # Inverse the attention for dark regions
-#         attention_map = 1 - attention_map
-#         return x * attention_map
 
 class DarkRegionAttentionModule(nn.Module):
     def __init__(self, channels, reduction=16):
@@ -180,7 +158,7 @@ class DarkRegionAttentionModule(nn.Module):
 
 
 class DenoiseLayer(nn.Module):
-    def __init__(self, channels, num_of_layers=6):
+    def __init__(self, channels, num_of_layers=5):
         super(DenoiseLayer, self).__init__()
         kernel_size = 3
         padding = 1
@@ -191,7 +169,7 @@ class DenoiseLayer(nn.Module):
         for i in range(num_of_layers - 2):
             if i % 2 != 0:
                 layers.append(nn.Conv2d(in_channels=features, out_channels=features, kernel_size=kernel_size, padding=padding, bias=False))
-                # layers.append(nn.BatchNorm2d(features))
+                layers.append(nn.BatchNorm2d(features))
                 layers.append(nn.ReLU(inplace=True))
             else:
                 layers.append(nn.Conv2d(in_channels=features, out_channels=features, kernel_size=kernel_size, padding=padding, bias=False))
@@ -245,19 +223,19 @@ class IlluminationEnhancerUNet(nn.Module):
     def __init__(self):
         super(IlluminationEnhancerUNet, self).__init__()
         # Reduced channel sizes for each block
-        self.encoder1 = UNetConvBlock(4, 32)  # Start with 32 channels
-        self.encoder2 = nn.Sequential(UNetConvBlock(32, 64), ResidualBlock(64), SEBlock(64))
+        # self.encoder1 = UNetConvBlock(4, 32)  # Start with 32 channels
+        self.encoder1 = nn.Sequential(UNetConvBlock(4, 32), ResidualBlock(32), SEBlock(32))
         # self.encoder2 = UNetConvBlock(64, 128)
         # self.sb1 = SEBlock(64)
-        self.encoder3 = UNetConvBlock(64, 128)
+        # self.encoder3 = UNetConvBlock(64, 128)
 
         # Reduced bottom layer size
-        self.bottom = UNetConvBlock(128, 256)
+        self.bottom = UNetConvBlock(32, 64)
 
         # Corresponding reductions in the decoder path
-        self.up3 = UNetUpBlock(256, 128)
-        self.up2 = UNetUpBlock(128, 64)
-        self.up1 = UNetUpBlock(64, 32)
+        # self.up3 = UNetUpBlock(128, 64)
+        self.up2 = UNetUpBlock(64, 32)
+        # self.up1 = UNetUpBlock(32, 16)
 
         # Final output layer remains the same
         self.final = nn.Sequential(
@@ -266,27 +244,28 @@ class IlluminationEnhancerUNet(nn.Module):
             nn.LeakyReLU(negative_slope=0.01)
         )
     
-    def forward(self, R_low, I_low):
-        x = torch.cat((R_low, I_low), dim=1)
+    def forward(self, x, I_low):
+        x = torch.cat((x, I_low), dim=1)
         enc1 = self.encoder1(x)
-        enc2 = self.encoder2(nn.MaxPool2d(2)(enc1))
-        enc3 = self.encoder3(nn.MaxPool2d(2)(enc2))
+        # enc2 = self.encoder2(nn.MaxPool2d(2)(enc1))
+        # enc3 = self.encoder3(nn.MaxPool2d(2)(enc2))
 
-        bottom = self.bottom(nn.MaxPool2d(2)(enc3))
+        bottom = self.bottom(nn.MaxPool2d(2)(enc1))
 
-        up3 = self.up3(bottom, enc3)
-        up2 = self.up2(up3, enc2)
+        # up3 = self.up3(bottom, enc2)
+        up2 = self.up2(bottom, enc1)
         # up2 = self.sb1(up2)
        
-        up1 = self.up1(up2, enc1)
+        # up1 = self.up1(up2, enc1)
 
-        output = self.final(up1)
+        output = self.final(up2)
         return output
 
 
 class RetinexUnet(nn.Module):
-    def __init__(self):
+    def __init__(self, stage=1):
         super(RetinexUnet, self).__init__()
+        self.stage = stage
         self.decompose = DecomposeNet()
         self.illumination_enhancer = IlluminationEnhancerUNet()
         self.refine = RefinementLayer(channels=1)
@@ -295,19 +274,21 @@ class RetinexUnet(nn.Module):
         
 
 
-    def forward(self, low, high):
-        R_low, I_low = self.decompose(low)
-        R_high, I_high = self.decompose(high)
-        
-        # R_low = self.denoise(R_low)
-        
-        I_low = self.dark_attention(I_low)
-        
-        enhanced_I_low = self.illumination_enhancer(R_low, I_low)
-        enhanced_I_low = self.refine(enhanced_I_low)
-        reconstruct = R_low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1)
-        reconstruct = self.denoise(reconstruct)
-        return R_low, R_high, enhanced_I_low, I_high, reconstruct
+    def forward(self, low):
+        for _ in range(self.stage):
+            I_low = self.decompose(low)
+            # R_high, I_high = self.decompose(high)
+            
+            # R_low = self.denoise(R_low)
+            
+            I_low = self.dark_attention(I_low)
+            
+            enhanced_I_low = self.illumination_enhancer(low, I_low)
+            enhanced_I_low = self.refine(enhanced_I_low)
+            reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1)
+            reconstruct = self.denoise(reconstruct)
+            low = reconstruct
+        return reconstruct
     
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -318,7 +299,7 @@ if __name__ == "__main__":
     model = RetinexUnet()
     input_low = torch.randn(1, 3, 224, 224)
     input_high = torch.randn(1, 3, 224, 224)
-    flops, params = profile(model, inputs=(input_low, input_high))
+    flops, params = profile(model, inputs=input_low)
 
     print('FLOPs: ', flops)
     print('Parameters: ', params)

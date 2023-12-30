@@ -6,3 +6,4 @@ train_newModel_image
 train_oneByOne
 train_experiment
 TransformerEngine
+train_smallModel

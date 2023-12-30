@@ -1,5 +1,5 @@
 import torch
-from dataload.retinexDCEloader import retinexDCE_loader
+from dataload.SID_loader import SIDDataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from network.retinex_dce import RetinexUnet
@@ -42,13 +42,13 @@ def weights_init(m):
 
 
 def train():
-    save_dir = "./train_smallModel/LOLv2Syn_newIter2"
+    save_dir = "./train_smallModel/sid_processed"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
 
-    train_dataset = retinexDCE_loader("Train_data/LOLv2/Synthetic/train/")
-    val_dataset =retinexDCE_loader("Train_data/LOLv2/Synthetic/test/")
+    train_dataset = SIDDataset("Train_data/sid_processed/train/long_sid2","Train_data/sid_processed/train/short_sid2")
+    val_dataset =SIDDataset("Train_data/sid_processed/test/long_sid2","Train_data/sid_processed/test/short_sid2")
     # train_dataset, val_dataset = train_test_split(dataset, test_size=0.1, random_state=42)
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
@@ -64,7 +64,7 @@ def train():
     model.to(device)
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
-    optimizer = optim.AdamW(model.parameters(), lr=2e-5) 
+    optimizer = optim.AdamW(model.parameters(), lr=1e-5) 
     num_epochs = 150
     # best_train_loss = float('inf')
     criterion = VGGLoss()
@@ -176,7 +176,7 @@ def train():
             # scheduler.step()
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/LOLv2Syn_newIter2.pth")
+                torch.save(model.state_dict(), f"./weights/LOLv1new.pth")
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
@@ -184,7 +184,7 @@ def train():
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig('./train_smallModel/LOLv2Syn_newIter2/training_validation_loss_plot.png')
+    plt.savefig('./train_smallModel/sid_processed/training_validation_loss_plot.png')
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -206,18 +206,18 @@ def test_model(model, dataloader, device, save_dir):
 if __name__ == "__main__":
     train()
     
-    test_dataset = retinexDCE_loader("Train_data/LOLv2/Synthetic/test/")
+    test_dataset = SIDDataset("Train_data/sid_processed/test/long_sid2","Train_data/sid_processed/test/short_sid2")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     model = RetinexUnet()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/LOLv2Syn_newIter2.pth")
+    state_dict = torch.load("./weights/sid_processed.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLv2Syn_newIter2"
+    save_dir = "./Test_image/sid_processed"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)

@@ -10,6 +10,8 @@ import glob
 import random
 import cv2
 from torchvision import transforms
+# from PIL import ImageFile
+# ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 random.seed(1143)
 
@@ -44,7 +46,7 @@ class retinexDCE_loader(data.Dataset):
         # Pairing and shuffling
         self.paired_list = list(zip(low_list, high_list))
         random.shuffle(self.paired_list)
-        self.size = 448
+        self.size = 224
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),
