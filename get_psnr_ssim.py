@@ -107,6 +107,8 @@ def calculate_average_psnr_ssim(num_images, folder_path):
     # average_psnr = total_psnr / num_images
     # average_ssim = total_ssim / num_images
     # return average_psnr, average_ssim
+
+
     print("use path: ", folder_path)
     total_psnr, total_ssim = 0, 0
     for i in range(1, num_images + 1):
@@ -138,7 +140,7 @@ def rename_files(folder_path, prefix):
             os.rename(os.path.join(folder_path, filename), os.path.join(folder_path, new_name))
             
 if __name__ == "__main__":
-    folder_path = './Test_image/LOLv2new'
+    folder_path = './Test_image/LOLv2Syn_newIter2'
     num_images = 100
     average_psnr, average_ssim = calculate_average_psnr_ssim(num_images, folder_path)
     print("Average PSNR:", average_psnr)

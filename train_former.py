@@ -2,7 +2,7 @@ import torch
 from dataload.retinexDCEloader import retinexDCE_loader
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from network.retinex_dce import RetinexUnet
+from network.RetinexFormer_arch import RetinexFormer
 import torch.optim as optim
 import torch.nn as nn
 import os
@@ -42,13 +42,13 @@ def weights_init(m):
 
 
 def train():
-    save_dir = "./train_smallModel/LOLv2_Synmoreinchan"
+    save_dir = "./train_smallModel/LOLv1_former"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     torch.cuda.empty_cache()
 
-    train_dataset = retinexDCE_loader("Train_data/LOLv2/Synthetic/train/")
-    val_dataset =retinexDCE_loader("Train_data/LOLv2/Synthetic/test/")
+    train_dataset = retinexDCE_loader("Train_data/LOLv1/train/")
+    val_dataset =retinexDCE_loader("Train_data/LOLv1/test/")
     # train_dataset, val_dataset = train_test_split(dataset, test_size=0.1, random_state=42)
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
@@ -56,7 +56,7 @@ def train():
     L_color = loss1.L_color()
     L_spa = loss1.L_spa()
     L_exp = loss1.L_exp(16,0.6)
-    model = RetinexUnet()
+    model = RetinexFormer()
     # model.apply(weights_init)
 
     model = nn.DataParallel(model)
@@ -176,7 +176,7 @@ def train():
             # scheduler.step()
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                torch.save(model.state_dict(), f"./weights/LOLv2_Synmoreinchan.pth")
+                torch.save(model.state_dict(), f"./weights/LOLv1_former.pth")
     plt.figure(figsize=(10, 5))
     plt.plot(train_losses, label='Training loss')
     plt.plot(val_losses, label='Validation loss')
@@ -184,7 +184,7 @@ def train():
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig('./train_smallModel/LOLv2_Synmoreinchan/training_validation_loss_plot.png')
+    plt.savefig('./train_smallModel/LOLv1_former/training_validation_loss_plot.png')
 
 
 def test_model(model, dataloader, device, save_dir):
@@ -206,18 +206,18 @@ def test_model(model, dataloader, device, save_dir):
 if __name__ == "__main__":
     train()
     
-    test_dataset = retinexDCE_loader("Train_data/LOLv2/Synthetic/test/")
+    test_dataset = retinexDCE_loader("Train_data/LOLv1/test/")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
-    model = RetinexUnet()
+    model = RetinexFormer()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/LOLv2_Synmoreinchan.pth")
+    state_dict = torch.load("./weights/LOLv1_former.pth")
 
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLv2_Synmoreinchan"
+    save_dir = "./Test_image/LOLv1_former"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     test_model(model, test_dataloader, device, save_dir)

@@ -113,6 +113,8 @@ class DecomposeNet(nn.Module):
         # Final recon layer
         self.net1_recon = nn.Conv2d(channel, 1, kernel_size,
                                     padding=1, padding_mode='replicate')
+        self.net2_recon = nn.Conv2d(channel, 3, kernel_size,
+                                    padding=1, padding_mode='replicate')
         
     def forward(self, input_im):
         input_max= torch.max(input_im, dim=1, keepdim=True)[0]
@@ -120,11 +122,12 @@ class DecomposeNet(nn.Module):
         feats0   = self.net1_conv0(input_img)
         featss   = self.net1_convs(feats0)
         # print(featss.shape)
-        outs     = self.net1_recon(featss)
+        outs     = self.net1_recon(featss) #I
         # R        = torch.sigmoid(outs[:, 0:3, :, :])
         # L        = torch.sigmoid(outs[:, 3:4, :, :])
         # return R, L
-        return outs
+        illu_map = self.net2_recon(featss)
+        return outs, illu_map
 
 
 class DarkRegionAttentionModule(nn.Module):
@@ -272,20 +275,18 @@ class RetinexUnet(nn.Module):
         self.dark_attention = DarkRegionAttentionModule(channels=1)
         self.denoise = DenoiseLayer(channels=3)
         
-
-
     def forward(self, low):
         for _ in range(self.stage):
-            I_low = self.decompose(low)
+            I_low, I_map = self.decompose(low)
             # R_high, I_high = self.decompose(high)
             
             # R_low = self.denoise(R_low)
             
             I_low = self.dark_attention(I_low)
             
-            enhanced_I_low = self.illumination_enhancer(low, I_low)
+            enhanced_I_low = self.illumination_enhancer(I_map, I_low)
             enhanced_I_low = self.refine(enhanced_I_low)
-            reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1)
+            reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
             reconstruct = self.denoise(reconstruct)
             low = reconstruct
         return reconstruct
