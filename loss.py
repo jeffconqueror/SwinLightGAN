@@ -7,7 +7,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 # import numpy as np
 from scipy.ndimage import gaussian_filter
-from pytorch_msssim import ssim
+# from pytorch_msssim import ssim
 
 class VGG19(torch.nn.Module):
     def __init__(self, requires_grad=False):

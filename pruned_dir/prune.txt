@@ -1,0 +1,6 @@
+Configuration: 
+[10, 1, 9, 8, 0, 0, 0, 0, 31, 27, 28, 30, 30, 29, 28]
+Number of parameters: 
+513238
+Test accuracy: 
+127913.64453125

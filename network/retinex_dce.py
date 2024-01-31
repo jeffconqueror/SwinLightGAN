@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
-from thop import profile
+# from thop import profile
        
     
 class ResidualBlock(nn.Module):
@@ -44,14 +44,14 @@ class UNetUpBlock(nn.Module):
         super(UNetUpBlock, self).__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
         # After concatenation, the total channels will be 'out_channels // 2 + out_channels // 2'
-        self.conv_block = UNetConvBlock(out_channels*2, out_channels)  # Change 'in_channels' to 'out_channels'
+        self.conv_block = UNetConvBlock(out_channels*2, out_channels)  
 
     def forward(self, x, bridge):
         up = self.up(x)
-        # print("up shape:", up.shape)  # Debugging print
-        # print("bridge shape:", bridge.shape)  # Debugging print
+        # print("up shape:", up.shape)  
+        # print("bridge shape:", bridge.shape)  
         out = torch.cat([up, bridge], dim=1)
-        # print("Concatenated shape:", out.shape)  # Debugging print
+        # print("Concatenated shape:", out.shape)  
         return self.conv_block(out)
 
 
@@ -299,8 +299,9 @@ def count_parameters(model):
 if __name__ == "__main__":
     model = RetinexUnet()
     input_low = torch.randn(1, 3, 224, 224)
-    input_high = torch.randn(1, 3, 224, 224)
-    flops, params = profile(model, inputs=input_low)
+    input_max = torch.max(input_low, dim=1, keepdim=True)[0]
+    input_four_channel = torch.cat((input_max, input_low), dim=1)
+    flops, params = profile(model, inputs=input_four_channel)
 
     print('FLOPs: ', flops)
     print('Parameters: ', params)

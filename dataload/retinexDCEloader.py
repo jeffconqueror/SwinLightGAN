@@ -38,7 +38,7 @@ def populate_high_train_list(lowlight_images_path):
 
 	
 
-class retinexDCE_loader(data.Dataset):
+class retinexDCE_loader_train(data.Dataset):
     def __init__(self, lowlight_images_path) -> None:
         low_list = populate_low_train_list(lowlight_images_path)
         high_list = populate_high_train_list(lowlight_images_path)
@@ -49,9 +49,11 @@ class retinexDCE_loader(data.Dataset):
         self.size = 224
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
+            # transforms.RandomHorizontalFlip(),
             # transforms.RandomRotation(10),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
+            # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
     
     
@@ -61,89 +63,74 @@ class retinexDCE_loader(data.Dataset):
         # data_lowlight_path = 
         data_lowlight = Image.open(data_lowlight_path)
         data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
-        # data_lowlight = self.transform(data_lowlight)
-        data_lowlight = (np.asarray(data_lowlight)/255.0) 
-        data_lowlight = torch.from_numpy(data_lowlight).float()
+        data_lowlight = self.transform(data_lowlight)
+        # data_lowlight = (np.asarray(data_lowlight)/255.0) 
+        # data_lowlight = torch.from_numpy(data_lowlight).float()
 		
 		
 		#high
         # data_highlight_path = self.data_highlight_path[index]
         data_highlight = Image.open(data_highlight_path)
         data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
-        # data_highlight = self.transform(data_highlight)
-        data_highlight = (np.asarray(data_highlight)/255.0) 
-        data_highlight = torch.from_numpy(data_highlight).float()
+        data_highlight = self.transform(data_highlight)
+        # data_highlight = (np.asarray(data_highlight)/255.0) 
+        # data_highlight = torch.from_numpy(data_highlight).float()
         
         
-        return data_lowlight.permute(2,0,1), data_highlight.permute(2,0,1)
-        # data_lowlight_path, data_highlight_path = self.paired_list[index]
-
-        # data_lowlight = Image.open(data_lowlight_path).convert('RGB')
-        # data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
-
-        # data_highlight = Image.open(data_highlight_path).convert('RGB')
-        # data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
-
-        # # Apply transformations
-        # data_lowlight = self.transform(data_lowlight)
-        # data_highlight = self.transform(data_highlight)
-
-        # # Convert to tensor
-        # data_lowlight = transforms.ToTensor()(data_lowlight)
-        # data_highlight = transforms.ToTensor()(data_highlight)
+        return data_lowlight, data_highlight
+       
+    
+    def __len__(self):
+        return len(self.paired_list)
+    
+    
+    
+class retinexDCE_loader_test(data.Dataset):
+    def __init__(self, lowlight_images_path) -> None:
+        low_list = populate_low_train_list(lowlight_images_path)
+        high_list = populate_high_train_list(lowlight_images_path)
         
-        # return data_lowlight, data_highlight
+        # Pairing and shuffling
+        self.paired_list = list(zip(low_list, high_list))
+        random.shuffle(self.paired_list)
+        self.size = 224
+        print("Total training examples:", len(self.paired_list))
+        self.transform = transforms.Compose([
+            # transforms.RandomHorizontalFlip(),
+            # transforms.RandomRotation(10),
+            # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    
+    
+    def __getitem__(self, index):
+        data_lowlight_path, data_highlight_path = self.paired_list[index]
+        
+        # data_lowlight_path = 
+        data_lowlight = Image.open(data_lowlight_path)
+        data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
+        data_lowlight = self.transform(data_lowlight)
+        # data_lowlight = (np.asarray(data_lowlight)/255.0) 
+        # data_lowlight = torch.from_numpy(data_lowlight).float()
+        
+        
+        #high
+        # data_highlight_path = self.data_highlight_path[index]
+        data_highlight = Image.open(data_highlight_path)
+        data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
+        data_highlight = self.transform(data_highlight)
+        # data_highlight = (np.asarray(data_highlight)/255.0) 
+        # data_highlight = torch.from_numpy(data_highlight).float()
+        
+        
+        return data_lowlight, data_highlight
+    
     
     def __len__(self):
         return len(self.paired_list)
 
 
 
-# import torch
-# import torchvision.transforms as transforms
-# from PIL import Image
-# import numpy as np
-# import glob
-# import random
 
-# class retinexDCE_loader(torch.utils.data.Dataset):
-#     def __init__(self, lowlight_images_path):
-#         self.train_low_list = self.populate_train_list(lowlight_images_path + "low/*.png")
-#         self.train_high_list = self.populate_train_list(lowlight_images_path + "high/*.png")
-#         self.size = 224
-#         self.transform = self.get_transforms()
 
-#     def populate_train_list(self, image_path):
-#         image_list = glob.glob(image_path)
-#         random.shuffle(image_list)
-#         return image_list
-
-#     def get_transforms(self):
-#         # Define the transformation pipeline
-#         transform = transforms.Compose([
-#             transforms.Resize((self.size, self.size)),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.RandomRotation(10),
-#             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-#             transforms.ToTensor()
-#         ])
-#         return transform
-
-#     def __getitem__(self, index):
-#         data_lowlight_path = self.train_low_list[index]
-#         data_highlight_path = self.train_high_list[index]
-
-#         data_lowlight = Image.open(data_lowlight_path).convert('RGB')
-#         data_highlight = Image.open(data_highlight_path).convert('RGB')
-
-#         # Apply the transformations
-#         data_lowlight = self.transform(data_lowlight)
-#         data_highlight = self.transform(data_highlight)
-
-#         return data_lowlight, data_highlight
-
-#     def __len__(self):
-#         return len(self.train_low_list)
-
-# # Example usage
-# # dataset = retinexDCE_loader("path/to/your/dataset/")
