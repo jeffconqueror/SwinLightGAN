@@ -26,6 +26,7 @@ import loss1
 import numpy as np
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+import torch.nn.utils.prune as prune
 
 # 
 def prune_weights(model, threshold=1e-3):
@@ -437,58 +438,91 @@ def test_model(model, dataloader, device, save_dir):
             save_image(low_light_imgs, save_path2, normalize=True)
 
 if __name__ == "__main__":
+    import torch.nn.utils.prune as prune
     model = RetinexUnet()
-    save_dir = "./train_quan/LOLv2Syn_quan"
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_dataset = retinexDCE_loader_train("Train_data/LOLv2/Synthetic/train/")
-    val_dataset =retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/")
-    train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
+    print(model.denoise.dncnn[5].se_block.fc[0])
+    parameters_to_prune = (
+        (model.decompose.net1_convs[0], 'weight'),
+        (model.decompose.net1_convs[2], 'weight'),
+        (model.decompose.net1_convs[3], 'weight'),
+        (model.decompose.net1_convs[5], 'weight'),
+        (model.decompose.net1_convs[6], 'weight'),
+        (model.decompose.net1_convs[7], 'weight'),
+        (model.decompose.net1_convs[8], 'weight'),
+        (model.illumination_enhancer.bottom.conv[0], 'weight'),
+        (model.illumination_enhancer.bottom.conv[2], 'weight'),
+        (model.illumination_enhancer.up2.conv_block.conv[1], 'weight'),
+        # (model.refine.refine, 'weight'),
+        (model.denoise.dncnn[0], 'weight'),
+        (model.denoise.dncnn[2], 'weight'),
+        (model.denoise.dncnn[5].se_block.fc[0], 'weight'),
+        (model.denoise.dncnn[5].se_block.fc[2], 'weight'),
+        (model.denoise.dncnn[6], 'weight'),
+        (model.denoise.dncnn[9], 'weight'),
+        (model.denoise.dncnn[12].se_block.fc[0], 'weight'),
+        (model.denoise.dncnn[12].se_block.fc[2], 'weight'),
+        (model.denoise.dncnn[13], 'weight'),
+    )
     
-    # train(model, train_loader, val_dataloader, device, save_dir)
+    prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=0.2)
     
-    #------------------perform pruning------------------#
-    saved_model_path = "./weights/LOLv2Syn_quan.pth"
-    pruned_model_path = "./weights/LOLv1_bestAfterPrune_test.pth"
-    prune_save_dir = "./pruned_dir"
-    smallest_linear_layer_size = float('inf')
 
-    smallest_conv_layer_size = float('inf')
 
-    # for m in model.modules():
-    #     if isinstance(m, nn.Conv2d):
-    #         layer_size = m.weight.data.numel()  # Number of elements in weight tensor
-    #         if layer_size < smallest_conv_layer_size:
-    #             smallest_conv_layer_size = layer_size
-
-    # print("Smallest convolutional layer size:", smallest_conv_layer_size)
-
+    # prune.random_unstructured(module.net1_convs, name="weight", amount=0.3)
+    
+    
+    
+    # save_dir = "./train_quan/LOLv2Syn_quan"
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # train_dataset = retinexDCE_loader_train("Train_data/LOLv2/Synthetic/train/")
+    # val_dataset =retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/")
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
+    # val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
+    
+    # # train(model, train_loader, val_dataloader, device, save_dir)
+    
+    # #------------------perform pruning------------------#
+    # saved_model_path = "./weights/LOLv2Syn_quan.pth"
+    # pruned_model_path = "./weights/LOLv1_bestAfterPrune_test.pth"
+    # prune_save_dir = "./pruned_dir"
     # smallest_linear_layer_size = float('inf')
 
-    # for m in model.modules():
-    #     if isinstance(m, nn.Linear):
-    #         layer_size = m.weight.data.numel()  # Number of elements in weight matrix
-    #         if layer_size < smallest_linear_layer_size:
-    #             smallest_linear_layer_size = layer_size
+    # smallest_conv_layer_size = float('inf')
 
-    # print("Smallest linear layer size:", smallest_linear_layer_size)
+    # # for m in model.modules():
+    # #     if isinstance(m, nn.Conv2d):
+    # #         layer_size = m.weight.data.numel()  # Number of elements in weight tensor
+    # #         if layer_size < smallest_conv_layer_size:
+    # #             smallest_conv_layer_size = layer_size
 
-    # pruned_model = perform_pruning(model, saved_model_path, val_dataloader, device, pruned_model_path, prune_save_dir)
-    ws_quant(model, 8, 8, device)
-    save_dir_quan = "./train_quan/LOLv2Syn_quan"
-    fine_tune(model, train_loader, val_dataloader, device, save_dir_quan)
-    test_dataset = retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/")
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
+    # # print("Smallest convolutional layer size:", smallest_conv_layer_size)
+
+    # # smallest_linear_layer_size = float('inf')
+
+    # # for m in model.modules():
+    # #     if isinstance(m, nn.Linear):
+    # #         layer_size = m.weight.data.numel()  # Number of elements in weight matrix
+    # #         if layer_size < smallest_linear_layer_size:
+    # #             smallest_linear_layer_size = layer_size
+
+    # # print("Smallest linear layer size:", smallest_linear_layer_size)
+
+    # # pruned_model = perform_pruning(model, saved_model_path, val_dataloader, device, pruned_model_path, prune_save_dir)
+    # ws_quant(model, 8, 8, device)
+    # save_dir_quan = "./train_quan/LOLv2Syn_quan"
+    # fine_tune(model, train_loader, val_dataloader, device, save_dir_quan)
+    # test_dataset = retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/")
+    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    state_dict = torch.load("./weights/LOLv2Syn_quan.pth")
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # state_dict = torch.load("./weights/LOLv2Syn_quan.pth")
 
-    # Create a new state dictionary with the "module." prefix removed from each key
-    new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    model.load_state_dict(new_state_dict)  # Load the trained weights
-    model.to(device)
-    save_dir = "./Test_image/LOLv2Syn_quan"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    test_model(model, test_dataloader, device, save_dir)
+    # # Create a new state dictionary with the "module." prefix removed from each key
+    # new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    # model.load_state_dict(new_state_dict)  # Load the trained weights
+    # model.to(device)
+    # save_dir = "./Test_image/LOLv2Syn_quan"
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # test_model(model, test_dataloader, device, save_dir)
