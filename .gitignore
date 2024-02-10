@@ -8,4 +8,5 @@ train_experiment
 TransformerEngine
 train_smallModel
 train_Prune*
+train_prune*
 train_quan*

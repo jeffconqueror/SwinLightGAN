@@ -188,7 +188,7 @@ class DenoiseLayer(nn.Module):
         out = self.dncnn(x)
         return identity + out
     
-
+#depth wise separable conv
 class HDR_ToneMappingLayer(nn.Module):
     def __init__(self, input_height=224, input_width=224):
         super(HDR_ToneMappingLayer, self).__init__()

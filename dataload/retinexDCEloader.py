@@ -49,6 +49,8 @@ class retinexDCE_loader_train(data.Dataset):
         self.size = 224
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
+            # transforms.Resize((224, 224)),
+            # transforms.RandomCrop(self.size),
             # transforms.RandomHorizontalFlip(),
             # transforms.RandomRotation(10),
             # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
@@ -61,7 +63,10 @@ class retinexDCE_loader_train(data.Dataset):
         data_lowlight_path, data_highlight_path = self.paired_list[index]
         
         # data_lowlight_path = 
+        
         data_lowlight = Image.open(data_lowlight_path)
+        data_highlight = Image.open(data_highlight_path)
+        # seed = torch.Generator().manual_seed(2147483647)
         data_lowlight = data_lowlight.resize((self.size,self.size), Image.LANCZOS)
         data_lowlight = self.transform(data_lowlight)
         # data_lowlight = (np.asarray(data_lowlight)/255.0) 
@@ -70,7 +75,7 @@ class retinexDCE_loader_train(data.Dataset):
 		
 		#high
         # data_highlight_path = self.data_highlight_path[index]
-        data_highlight = Image.open(data_highlight_path)
+        
         data_highlight = data_highlight.resize((self.size,self.size), Image.LANCZOS)
         data_highlight = self.transform(data_highlight)
         # data_highlight = (np.asarray(data_highlight)/255.0) 
