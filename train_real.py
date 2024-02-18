@@ -145,10 +145,10 @@ def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750)
         print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {loss}, Validation Loss: {avg_val_loss}')
         
         scheduler.step()
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            weights_file_path = os.path.join("./weights", save_dir, "model_epoch_{}.pth".format(epoch))
-            torch.save(model.state_dict(), weights_file_path)
+        # if avg_val_loss < best_val_loss:
+        best_val_loss = avg_val_loss
+        weights_file_path = os.path.join("./weights", save_dir, "model_epoch_{}.pth".format(epoch))
+        torch.save(model.state_dict(), weights_file_path)
 
             
     plt.figure(figsize=(10, 5))
@@ -466,6 +466,8 @@ def best_weights(model, weights_folder, device, test_dataloader, save_dir):
     highest_psnr = 0
     best_weight_file = ''
     results_file = os.path.join(save_dir, "weights_evaluation_results.txt")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     with open(results_file, "w") as f:
         for weight_file in os.listdir(weights_folder):
             print("using file: ", weight_file)
@@ -487,7 +489,7 @@ def best_weights(model, weights_folder, device, test_dataloader, save_dir):
 if __name__ == "__main__":
     import torch.nn.utils.prune as prune
     model = RetinexUnet()
-    summary(model.cuda(), (3,224,224))
+    # summary(model.cuda(), (3,224,224))
     # print(model.denoise)
     # print(model.denoise.dncnn[13])
     # parameters_to_prune = (
@@ -550,7 +552,7 @@ if __name__ == "__main__":
     
     
     
-    save_dir = "./train_prune/LOLv2Real_prune0.2"
+    save_dir = "./train_prune/LOLv2Real_prune_I_map"
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     train_dataset = retinexDCE_loader_train("Train_data/LOLv2/Real_captured/train/")
     val_dataset =retinexDCE_loader_test("Train_data/LOLv2/Real_captured/test/")
@@ -592,17 +594,18 @@ if __name__ == "__main__":
     test_dataset = retinexDCE_loader_test("Train_data/LOLv2/Real_captured/test/")
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     
-    best_weights(model, weights_folder="weights/train_prune/LOLv2Real_prune0.2", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
+    # best_weights(model, weights_folder="weights/train_prune/LOLv2Real_prune_I_map", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #692->22.85/0.89
-    # state_dict = torch.load("./weights/train_prune/LOLv2Real_prune0.2/model_epoch_682.pth")
+    #700->25.2/0.908
+    state_dict = torch.load("./weights/train_prune/LOLv2Real_prune_I_map/model_epoch_700.pth")
 
-    # # # Create a new state dictionary with the "module." prefix removed from each key
-    # new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    # model.load_state_dict(new_state_dict)  # Load the trained weights
-    # model.to(device)
-    # save_dir = "./Test_image/LOLv2Real_prune"
+    # # Create a new state dictionary with the "module." prefix removed from each key
+    new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    model.load_state_dict(new_state_dict)  # Load the trained weights
+    model.to(device)
+    save_dir = "./Test_image/LOLv2Real_prune_I_map"
     
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # test_model(model, test_dataloader, device, save_dir)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    test_model(model, test_dataloader, device, save_dir)

@@ -190,7 +190,7 @@ class DenoiseLayer(nn.Module):
     
 #depth wise separable conv
 class HDR_ToneMappingLayer(nn.Module):
-    def __init__(self, input_height=224, input_width=224):
+    def __init__(self, input_height=384, input_width=384):
         super(HDR_ToneMappingLayer, self).__init__()
         # Global tone mapping factor
         self.global_tone_mapping_factor = nn.Parameter(torch.ones(1))
@@ -286,7 +286,8 @@ class RetinexUnet(nn.Module):
             
             enhanced_I_low = self.illumination_enhancer(I_map, I_low)
             enhanced_I_low = self.refine(enhanced_I_low)
-            reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
+            # reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
+            reconstruct = I_map * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
             reconstruct = self.denoise(reconstruct)
             low = reconstruct
         return reconstruct
