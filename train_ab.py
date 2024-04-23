@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import torch.nn.utils.prune as prune
 from get_psnr_ssim import calculate_average_psnr_ssim
 
+
  
 def prune_weights(model, threshold=1e-3):
     for name, module in model.named_modules():
@@ -73,7 +74,7 @@ def lr_schedule(epoch, warmup_epochs=75, max_lr_epochs=600, total_epochs=750):
         lr = max_lr * (1.0 - (epoch - max_lr_epochs) / (total_epochs - max_lr_epochs))
     return lr
     
-def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750):
+def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=200):
     weights_dir_path = os.path.join("./weights", save_dir)
     if not os.path.exists(weights_dir_path):
         os.makedirs(weights_dir_path)
@@ -89,7 +90,7 @@ def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750)
     model.to(device)
     total_params = sum(p.numel() for p in model.parameters())
     print(total_params)
-    optimizer = optim.AdamW(model.parameters(), lr=2e-5) 
+    optimizer = optim.AdamW(model.parameters(), lr=1e-5) 
     # num_epochs = 150
     # best_train_loss = float('inf')
     criterion = VGGLoss()
@@ -97,9 +98,9 @@ def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750)
     best_val_loss = float('inf')
     train_losses = []
     val_losses = []
-    # scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_schedule)
-    plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_schedule)
+    # plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
     for epoch in range(num_epochs):
         train_loss = 0
         model.train()
@@ -132,7 +133,7 @@ def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750)
             val_loss = test(None, model, val_dataloader, device, save_dir, epoch=epoch)    
         avg_val_loss = val_loss / len(val_dataloader)
         avg_train_loss = train_loss / len(train_loader)
-        plateau_scheduler.step(avg_val_loss)
+        # plateau_scheduler.step(avg_val_loss)
         if isinstance(avg_train_loss, torch.Tensor):
             avg_train_loss = avg_train_loss.detach().cpu().item()
         if isinstance(avg_val_loss, torch.Tensor):
@@ -145,10 +146,10 @@ def train(model, train_loader, val_dataloader, device, save_dir, num_epochs=750)
         print(f'Epoch {epoch+1}/{num_epochs}, Training Loss: {loss}, Validation Loss: {avg_val_loss}')
         
         scheduler.step()
-        # if avg_val_loss < best_val_loss:
-        best_val_loss = avg_val_loss
-        weights_file_path = os.path.join("./weights", save_dir, "model_epoch_{}.pth".format(epoch))
-        torch.save(model.state_dict(), weights_file_path)
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            weights_file_path = os.path.join("./weights", save_dir, "model_epoch_{}.pth".format(epoch))
+            torch.save(model.state_dict(), weights_file_path)
 
             
     plt.figure(figsize=(10, 5))
@@ -192,6 +193,7 @@ def test(args, model, test_loader, device, save_dir, scheduler = None, save=Fals
 
     return val_loss
  
+
     
 def test_model(model, dataloader, device, save_dir):
     
@@ -208,7 +210,7 @@ def test_model(model, dataloader, device, save_dir):
             save_image(low_output, save_path, normalize=True)
             save_image(well_lit_imgs, save_path1, normalize=True)
             save_image(low_light_imgs, save_path2, normalize=True)
-
+            
 def test_real(model, dataloader, device, save_dir):
     
     model.eval()  # Set the model to evaluation mode
@@ -225,7 +227,6 @@ def test_real(model, dataloader, device, save_dir):
             # save_image(well_lit_imgs, save_path1, normalize=True)
             save_image(low_light_imgs, save_path2, normalize=True)
 
-     
 def best_weights(model, weights_folder, device, test_dataloader, save_dir):
     highest_psnr = 0
     best_weight_file = ''
@@ -250,135 +251,48 @@ def best_weights(model, weights_folder, device, test_dataloader, save_dir):
     print("best psnr: ", highest_psnr)
     print("saved to ", best_weight_file)
     return best_weight_file, highest_psnr
+
 if __name__ == "__main__":
     import torch.nn.utils.prune as prune
     model = RetinexUnet()
-    # summary(model.cuda(), (3,224,224))
-    # print(model.denoise)
-    # print(model.denoise.dncnn[13])
-    # parameters_to_prune = (
-    #     (model.decompose.net1_convs[0], 'weight'),
-    #     (model.decompose.net1_convs[2].fc[0], 'weight'),
-    #     (model.decompose.net1_convs[2].fc[2], 'weight'),
-    #     (model.decompose.net1_convs[3], 'weight'),
-    #     (model.decompose.net1_convs[5].fc[0], 'weight'),
-    #     (model.decompose.net1_convs[5].fc[2], 'weight'),
-    #     (model.decompose.net1_convs[6].conv1, 'weight'),
-    #     (model.decompose.net1_convs[6].conv2, 'weight'),
-    #     (model.decompose.net1_convs[6].se_block.fc[0], 'weight'),
-    #     (model.decompose.net1_convs[6].se_block.fc[2], 'weight'),
-    #     (model.decompose.net1_convs[7].fc[0], 'weight'),
-    #     (model.decompose.net1_convs[7].fc[2], 'weight'),
-    #     (model.decompose.net1_convs[8], 'weight'),
-    #     (model.illumination_enhancer.bottom.conv[0], 'weight'),
-    #     (model.illumination_enhancer.bottom.conv[2], 'weight'),
-    #     (model.illumination_enhancer.up2.conv_block.conv[0], 'weight'),
-    #     (model.illumination_enhancer.up2.conv_block.conv[2], 'weight'),
-    #     (model.refine.refine[0], 'weight'),
-    #     (model.refine.refine[2].fc[0], 'weight'),
-    #     (model.refine.refine[2].fc[2], 'weight'),
-    #     (model.refine.refine[3].conv1, 'weight'),
-    #     (model.refine.refine[3].conv2, 'weight'),
-    #     (model.refine.refine[3].se_block.fc[0], 'weight'),
-    #     (model.refine.refine[3].se_block.fc[2], 'weight'),
-    #     (model.refine.refine[4], 'weight'),
-    #     (model.refine.refine[6].fc[0], 'weight'),
-    #     (model.refine.refine[6].fc[2], 'weight'),
-    #     (model.refine.refine[7].conv1, 'weight'),
-    #     (model.refine.refine[7].conv2, 'weight'),
-    #     (model.refine.refine[7].se_block.fc[0], 'weight'),
-    #     (model.refine.refine[7].se_block.fc[2], 'weight'),
-    #     (model.refine.refine[8], 'weight'),
-    #     (model.dark_attention.path1[0], 'weight'),
-    #     (model.dark_attention.path2[0], 'weight'),
-    #     (model.dark_attention.merge_conv, 'weight'),
-    #     (model.denoise.dncnn[0], 'weight'),
-    #     (model.denoise.dncnn[2], 'weight'),
-    #     (model.denoise.dncnn[5].conv1, 'weight'),
-    #     (model.denoise.dncnn[5].conv2, 'weight'),
-    #     (model.denoise.dncnn[5].se_block.fc[0], 'weight'),
-    #     (model.denoise.dncnn[5].se_block.fc[2], 'weight'),
-    #     (model.denoise.dncnn[6], 'weight'),
-    #     (model.denoise.dncnn[9], 'weight'),
-    #     (model.denoise.dncnn[10], 'weight'),
-    #     (model.denoise.dncnn[12].conv1, 'weight'),
-    #     (model.denoise.dncnn[12].conv2, 'weight'),
-    #     (model.denoise.dncnn[12].se_block.fc[0], 'weight'),
-    #     (model.denoise.dncnn[12].se_block.fc[2], 'weight'),
-    #     (model.denoise.dncnn[13], 'weight'),
-    # )
     
-    # prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=0.2)
-    
-
-
-    # prune.random_unstructured(module.net1_convs, name="weight", amount=0.3)
-    
-    
-    
-    save_dir = "./train_prune/LOLv2Real_prune_Dsize"
+    save_dir = "./train_prune/LOLv2Syn_prune_ablation_noDenoise"
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_dataset = retinexDCE_loader_train("Train_data/LOLv2/Real_captured/train/")
-    val_dataset =retinexDCE_loader_test("Train_data/LOLv2/Real_captured/test/")
+    train_dataset = retinexDCE_loader_train("Train_data/LOLv2/Synthetic/train/")
+    val_dataset =retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/")
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
     
     # train(model, train_loader, val_dataloader, device, save_dir)
     
-    # #------------------perform pruning------------------#
-    # saved_model_path = "./weights/LOLv2Syn_quan.pth"
-    # pruned_model_path = "./weights/LOLv1_bestAfterPrune_test.pth"
-    # prune_save_dir = "./pruned_dir"
-    # smallest_linear_layer_size = float('inf')
 
-    # smallest_conv_layer_size = float('inf')
-
-    # # for m in model.modules():
-    # #     if isinstance(m, nn.Conv2d):
-    # #         layer_size = m.weight.data.numel()  # Number of elements in weight tensor
-    # #         if layer_size < smallest_conv_layer_size:
-    # #             smallest_conv_layer_size = layer_size
-
-    # # print("Smallest convolutional layer size:", smallest_conv_layer_size)
-
-    # # smallest_linear_layer_size = float('inf')
-
-    # # for m in model.modules():
-    # #     if isinstance(m, nn.Linear):
-    # #         layer_size = m.weight.data.numel()  # Number of elements in weight matrix
-    # #         if layer_size < smallest_linear_layer_size:
-    # #             smallest_linear_layer_size = layer_size
-
-    # # print("Smallest linear layer size:", smallest_linear_layer_size)
-
-    # # pruned_model = perform_pruning(model, saved_model_path, val_dataloader, device, pruned_model_path, prune_save_dir)
-    # ws_quant(model, 8, 8, device)
-    # save_dir_quan = "./train_quan/LOLv2Syn_quan"
-    # fine_tune(model, train_loader, val_dataloader, device, save_dir_quan)
-    test_dataset = retinexDCE_loader_test("Train_data/LOLv2/Real_captured/test/", size=384)
+    test_dataset = retinexDCE_loader_test("Train_data/LOLv2/Synthetic/test/", size=384)
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     
-    # best_weights(model, weights_folder="weights/train_prune/LOLv2Real_prune_Dsize", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
+
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #692->22.85/0.89
-    #700->25.2/0.908
-    #431->24.49/0.895
-    #196->24.58/0.878
-    state_dict = torch.load("./weights/train_prune/LOLv2Real_prune_Dsize/model_epoch_431.pth")
-
-    # # # Create a new state dictionary with the "module." prefix removed from each key
+    #588->23.7/0.90
+    #700->24.4/0.91
+    #699->23.65
+    save_dir = "./Test_image/LOLv2Syn_prune_ablation_noDenoise"
+    # best_weights(model, weights_folder="weights/train_prune/LOLv2Syn_prune_ablation_noDenoise", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
+    state_dict = torch.load("./weights/train_prune/LOLv2Syn_prune_ablation_noDenoise/model_epoch_183.pth")
+    # model = torch.ao.quantization.quantize_dynamic(
+    #     model,  # the original model
+    #     {torch.nn.Linear},  # a set of layers to dynamically quantize
+    #     dtype=torch.qint8)
+    # # # # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLv2Real_prune_Dsize_traditional"
     
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # test_model(model, test_dataloader, device, save_dir)
-    
-    # save_dir = "./Test_image/LOLv2Real_prune_Dsize_realTest"
-    test_dataset = UnpairedLowLightLoader("Train_data/traditional")
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    test_real(model, test_dataloader, device, save_dir)
+    test_model(model, test_dataloader, device, save_dir)
+    # save_dir = "./Test_image/LOLv2Syn_prune_Dsize_zeroDCE"
+    # test_dataset = UnpairedLowLightLoader("Train_data/zeroDCE")
+    # test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # test_real(model, test_dataloader, device, save_dir)

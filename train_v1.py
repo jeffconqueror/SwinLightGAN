@@ -1,5 +1,5 @@
 import torch
-from dataload.retinexDCEloader import retinexDCE_loader_train, retinexDCE_loader_test
+from dataload.retinexDCEloader import retinexDCE_loader_train, retinexDCE_loader_test, UnpairedLowLightLoader
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from network.retinex_dce import RetinexUnet
@@ -462,6 +462,22 @@ def test_model(model, dataloader, device, save_dir):
             save_image(low_output, save_path, normalize=True)
             save_image(well_lit_imgs, save_path1, normalize=True)
             save_image(low_light_imgs, save_path2, normalize=True)
+            
+def test_real(model, dataloader, device, save_dir):
+    
+    model.eval()  # Set the model to evaluation mode
+    with torch.no_grad():  # Disable gradient computation during testing
+        for i, low_light_imgs in enumerate(dataloader):
+            low_light_imgs = low_light_imgs.to(device)
+            low_output = model(low_light_imgs)
+            # I_low_3 = torch.concat([I_low, I_low, I_low], dim=1)
+            # low_output = R_low*I_low_3
+            save_path = os.path.join(save_dir, f"test_batch_{i+1}.jpg")
+            # save_path1 = os.path.join(save_dir, f"test_batch_{i+1}_truth.jpg")
+            save_path2 = os.path.join(save_dir, f"test_batch_{i+1}_low.jpg")
+            save_image(low_output, save_path, normalize=True)
+            # save_image(well_lit_imgs, save_path1, normalize=True)
+            save_image(low_light_imgs, save_path2, normalize=True)
 
 def best_weights(model, weights_folder, device, test_dataloader, save_dir):
     highest_psnr = 0
@@ -493,19 +509,19 @@ if __name__ == "__main__":
     
     
     
-    save_dir = "./train_prune/LOLv1_prune_finetune_i_map"
+    save_dir = "./train_prune/LOLv1_prune_Dsize_finetune"
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     train_dataset = retinexDCE_loader_train("Train_data/LOLv1/train/")
     val_dataset =retinexDCE_loader_test("Train_data/LOLv1/test/")
     train_loader = DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=8, shuffle=False)
     
-    state_dict_path = "./weights/train_prune/LOLv2Real_prune_I_map/model_epoch_685.pth"
+    state_dict_path = "./weights/train_prune/LOLv2Real_prune_Dsize/model_epoch_680.pth"
     state_dict = torch.load(state_dict_path, map_location=device)
     new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)
     
-    save_dir = "./train_prune/LOLv1_prune_finetune_i_map"
+    save_dir = "./train_prune/LOLv1_prune_Dsize_finetune"
     # train(model, train_loader, val_dataloader, device, save_dir, num_epochs=200)
     
     # train(model, train_loader, val_dataloader, device, save_dir)
@@ -540,19 +556,28 @@ if __name__ == "__main__":
     # ws_quant(model, 8, 8, device)
     # save_dir_quan = "./train_quan/LOLv2Syn_quan"
     # fine_tune(model, train_loader, val_dataloader, device, save_dir_quan)
-    test_dataset = retinexDCE_loader_test("Train_data/LOLv1/test/")
+    test_dataset = retinexDCE_loader_test("Train_data/LOLv1/test/", size=384)
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     
 
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     #63->23.47/0.908
-    state_dict = torch.load("./weights/train_prune/LOLv1_prune_finetune_i_map/model_epoch_64.pth")
-    # best_weights(model, weights_folder="./weights/train_prune/LOLv1_prune_finetune_i_map", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
+    #680->23.66/0.873
+    #196->23.67/0.876
+    state_dict = torch.load("./weights/train_prune/LOLv1_prune_Dsize_finetune/model_epoch_196.pth")
+    # best_weights(model, weights_folder="./weights/train_prune/LOLv1_prune_Dsize_finetune", device=device, test_dataloader=test_dataloader, save_dir=save_dir)
     # Create a new state dictionary with the "module." prefix removed from each key
     new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(new_state_dict)  # Load the trained weights
     model.to(device)
-    save_dir = "./Test_image/LOLv1_prune_finetune_i_map"
+    save_dir = "./Test_image/LOLv1_prune_Dsize_finetune"
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
+    # test_model(model, test_dataloader, device, save_dir)
+    
+    save_dir = "./Test_image/LOLv1_prune_Dsize_finetune_realTest"
+    test_dataset = UnpairedLowLightLoader("Train_data/forTesting")
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    test_model(model, test_dataloader, device, save_dir)
+    test_real(model, test_dataloader, device, save_dir)

@@ -46,7 +46,7 @@ class retinexDCE_loader_train(data.Dataset):
         # Pairing and shuffling
         self.paired_list = list(zip(low_list, high_list))
         random.shuffle(self.paired_list)
-        self.size = 384
+        self.size = 224
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
             # transforms.Resize((224, 224)),
@@ -91,14 +91,14 @@ class retinexDCE_loader_train(data.Dataset):
     
     
 class retinexDCE_loader_test(data.Dataset):
-    def __init__(self, lowlight_images_path) -> None:
+    def __init__(self, lowlight_images_path, size=224) -> None:
         low_list = populate_low_train_list(lowlight_images_path)
         high_list = populate_high_train_list(lowlight_images_path)
         
         # Pairing and shuffling
         self.paired_list = list(zip(low_list, high_list))
         random.shuffle(self.paired_list)
-        self.size = 384
+        self.size = size
         print("Total training examples:", len(self.paired_list))
         self.transform = transforms.Compose([
             # transforms.RandomHorizontalFlip(),
@@ -136,6 +136,30 @@ class retinexDCE_loader_test(data.Dataset):
         return len(self.paired_list)
 
 
+class UnpairedLowLightLoader(data.Dataset):
+    def __init__(self, images_path, size=224):
+        """
+        images_path: path to the directory containing low-light images.
+        size: the desired size to resize the images.
+        """
+        self.images_path = images_path
+        self.image_files = [os.path.join(images_path, f) for f in os.listdir(images_path) if os.path.isfile(os.path.join(images_path, f))]
+        self.size = size
+        self.transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, index):
+        image_path = self.image_files[index]
+        image = Image.open(image_path).convert('RGB')
+        # image = image.resize((self.size, self.size), Image.LANCZOS)
+        image = self.transform(image)
+        return image
 
 
 

@@ -2,7 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
-# from thop import profile
+from ptflops import get_model_complexity_info
+import torchvision.models as models
+from thop import profile
+from fvcore.nn import FlopCountAnalysis, parameter_count_table
+from torchprofile import profile_macs
+from torchstat import stat
+from torchviz import make_dot
        
     
 class ResidualBlock(nn.Module):
@@ -28,10 +34,8 @@ class UNetConvBlock(nn.Module):
         super(UNetConvBlock, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels//2, 3, padding=1),
-            # nn.BatchNorm2d(out_channels),  # Batch normalization
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(out_channels//2, out_channels, 3, padding=1),
-            # nn.BatchNorm2d(out_channels),  # Batch normalization
             nn.LeakyReLU(inplace=True)
         )
 
@@ -43,15 +47,12 @@ class UNetUpBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UNetUpBlock, self).__init__()
         self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
-        # After concatenation, the total channels will be 'out_channels // 2 + out_channels // 2'
+        # after concatenation, the total channels will be 'out_channels // 2 + out_channels // 2'
         self.conv_block = UNetConvBlock(out_channels*2, out_channels)  
 
     def forward(self, x, bridge):
-        up = self.up(x)
-        # print("up shape:", up.shape)  
-        # print("bridge shape:", bridge.shape)  
+        up = self.up(x)  
         out = torch.cat([up, bridge], dim=1)
-        # print("Concatenated shape:", out.shape)  
         return self.conv_block(out)
 
 
@@ -73,7 +74,7 @@ class RefinementLayer(nn.Module):
     def forward(self, x):
         return self.refine(x)
     
-class SEBlock(nn.Module): #could try reduction in here
+class SEBlock(nn.Module): #could try reduction here
     def __init__(self, channel, reduction=16):
         super(SEBlock, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -103,8 +104,7 @@ class DecomposeNet(nn.Module):
                                                   padding=1, padding_mode='replicate'),
                                         nn.ReLU(),
                                         SEBlock(channel),
-                                        ResidualBlock(channel),  # Adding a residual block
-                                        # DilatedConvLayer(channel, channel, dilation=2),  
+                                        ResidualBlock(channel),  # adding a residual block
                                         SEBlock(channel),
                                         nn.Conv2d(channel, channel, kernel_size,
                                                   padding=1, padding_mode='replicate'),
@@ -121,38 +121,31 @@ class DecomposeNet(nn.Module):
         input_img= torch.cat((input_max, input_im), dim=1)
         feats0   = self.net1_conv0(input_img)
         featss   = self.net1_convs(feats0)
-        # print(featss.shape)
-        outs     = self.net1_recon(featss) #I
-        # R        = torch.sigmoid(outs[:, 0:3, :, :])
-        # L        = torch.sigmoid(outs[:, 3:4, :, :])
-        # return R, L
-        illu_map = self.net2_recon(featss)
-        return outs, illu_map
+        outs     = self.net1_recon(featss) #L
+        reflec_map = self.net2_recon(featss) #R
+        return outs, reflec_map
 
 
 class DarkRegionAttentionModule(nn.Module):
     def __init__(self, channels, reduction=16):
         super(DarkRegionAttentionModule, self).__init__()
-        # Define separate pathways for different scales
         self.path1 = nn.Sequential(nn.Conv2d(channels, channels, 3, stride=2, padding=1), nn.ReLU())
         self.path2 = nn.Sequential(nn.Conv2d(channels, channels, 5, stride=2, padding=2), nn.ReLU())
-        # Upsampling back to original size
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        # Convolution to merge the multi-scale features
         self.merge_conv = nn.Conv2d(channels*3, channels, 1)
 
     def forward(self, x):
-        # Original path
+        # original path
         original_features = x
-        # Path 1 features
+        # path 1 features
         path1_features = self.path1(x)
         path1_att = torch.sigmoid(path1_features)
         path1_features = self.upsample(path1_features * path1_att)
-        # Path 2 features
+        # path 2 features
         path2_features = self.path2(x)
         path2_att = torch.sigmoid(path2_features)
         path2_features = self.upsample(path2_features * path2_att)
-        # Merge multi-scale features
+        # merge multi-scale features
         merged_features = torch.cat([original_features, path1_features, path2_features], dim=1)
         out = self.merge_conv(merged_features)
         return out
@@ -188,35 +181,33 @@ class DenoiseLayer(nn.Module):
         out = self.dncnn(x)
         return identity + out
     
-#depth wise separable conv
 class HDR_ToneMappingLayer(nn.Module):
-    def __init__(self, input_height=384, input_width=384):
+    def __init__(self, input_height=224, input_width=224):
         super(HDR_ToneMappingLayer, self).__init__()
-        # Global tone mapping factor
+        # global tone mapping factor
         self.global_tone_mapping_factor = nn.Parameter(torch.ones(1))
 
-        # Local tone mapping components
+        # local tone mapping components
         self.local_tone_conv1 = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False)
         self.local_tone_conv2 = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False)
 
-        # Activation functions and normalization
         self.relu = nn.LeakyReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
-        self.layernorm = nn.LayerNorm([input_height, input_width])  # Assuming input images are 224
 
     def forward(self, x):
-        # Global tone mapping
+        # global tone mapping
         global_tone_mapped = torch.log1p(x * self.global_tone_mapping_factor)
 
-        # Local tone mapping
+        # local tone mapping
         local_tone_mapped = self.relu(self.local_tone_conv1(x))
         local_tone_mapped = self.relu(self.local_tone_conv2(local_tone_mapped))
 
         # Combine global and local tone mappings
         combined_tone_mapped = global_tone_mapped + local_tone_mapped
 
-        # Normalization and final activation
-        combined_tone_mapped = self.layernorm(combined_tone_mapped)
+        # normalization
+        combined_tone_mapped = nn.functional.layer_norm(
+            combined_tone_mapped, combined_tone_mapped.size()[1:])
         combined_tone_mapped = self.sigmoid(combined_tone_mapped)
 
         return combined_tone_mapped
@@ -225,22 +216,9 @@ class HDR_ToneMappingLayer(nn.Module):
 class IlluminationEnhancerUNet(nn.Module):
     def __init__(self):
         super(IlluminationEnhancerUNet, self).__init__()
-        # Reduced channel sizes for each block
-        # self.encoder1 = UNetConvBlock(4, 32)  # Start with 32 channels
         self.encoder1 = nn.Sequential(UNetConvBlock(4, 32), ResidualBlock(32), SEBlock(32))
-        # self.encoder2 = UNetConvBlock(64, 128)
-        # self.sb1 = SEBlock(64)
-        # self.encoder3 = UNetConvBlock(64, 128)
-
-        # Reduced bottom layer size
         self.bottom = UNetConvBlock(32, 64)
-
-        # Corresponding reductions in the decoder path
-        # self.up3 = UNetUpBlock(128, 64)
         self.up2 = UNetUpBlock(64, 32)
-        # self.up1 = UNetUpBlock(32, 16)
-
-        # Final output layer remains the same
         self.final = nn.Sequential(
             nn.Conv2d(32, 1, kernel_size=1),  # Output channel is 1
             HDR_ToneMappingLayer(),
@@ -250,17 +228,8 @@ class IlluminationEnhancerUNet(nn.Module):
     def forward(self, x, I_low):
         x = torch.cat((x, I_low), dim=1)
         enc1 = self.encoder1(x)
-        # enc2 = self.encoder2(nn.MaxPool2d(2)(enc1))
-        # enc3 = self.encoder3(nn.MaxPool2d(2)(enc2))
-
         bottom = self.bottom(nn.MaxPool2d(2)(enc1))
-
-        # up3 = self.up3(bottom, enc2)
         up2 = self.up2(bottom, enc1)
-        # up2 = self.sb1(up2)
-       
-        # up1 = self.up1(up2, enc1)
-
         output = self.final(up2)
         return output
 
@@ -277,19 +246,14 @@ class RetinexUnet(nn.Module):
         
     def forward(self, low):
         for _ in range(self.stage):
-            I_low, I_map = self.decompose(low)
-            # R_high, I_high = self.decompose(high)
-            
-            # R_low = self.denoise(R_low)
-            
-            I_low = self.dark_attention(I_low)
-            
-            enhanced_I_low = self.illumination_enhancer(I_map, I_low)
-            enhanced_I_low = self.refine(enhanced_I_low)
-            # reconstruct = low * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
-            reconstruct = I_map * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
-            reconstruct = self.denoise(reconstruct)
+            I_low1, I_map = self.decompose(low)
+            I_low = self.dark_attention(I_low1)     
+            enhanced_I_low1 = self.illumination_enhancer(I_map, I_low)
+            enhanced_I_low = self.refine(enhanced_I_low1)
+            reconstruct1 = I_map * torch.concat([enhanced_I_low, enhanced_I_low, enhanced_I_low], dim=1) + low
+            reconstruct = self.denoise(reconstruct1)
             low = reconstruct
+        # return reconstruct
         return reconstruct
     
 def count_parameters(model):
@@ -299,12 +263,6 @@ def count_parameters(model):
 
 if __name__ == "__main__":
     model = RetinexUnet()
-    input_low = torch.randn(1, 3, 224, 224)
-    input_max = torch.max(input_low, dim=1, keepdim=True)[0]
-    input_four_channel = torch.cat((input_max, input_low), dim=1)
-    flops, params = profile(model, inputs=input_four_channel)
-
-    print('FLOPs: ', flops)
-    print('Parameters: ', params)
-    for name, module in model.named_children():
-        print(f"{name}: {count_parameters(module)} params")
+    inputs = torch.randn(1, 3, 224, 224)
+    flops = FlopCountAnalysis(model, inputs)
+    print('FlopCountAnalysis FLOPs: ', flops.total())
